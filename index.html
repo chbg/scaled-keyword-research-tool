@@ -624,16 +624,38 @@
                 updateProgress(1, 10, 'Getting top 10 URLs for your keyword...', 'Calling DataForSEO API...');
                 
                 console.log('🌐 Making API call to keyword-research function...');
-                const response = await fetch('/.netlify/functions/keyword-research', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        keyword: keyword,
-                        max_supporting_keywords: parseInt(maxSupporting)
-                    })
+                console.log('🔗 API URL:', '/.netlify/functions/keyword-research');
+                console.log('🌍 Current URL:', window.location.href);
+                console.log('📤 Request body:', {
+                    keyword: keyword,
+                    max_supporting_keywords: parseInt(maxSupporting)
                 });
+                
+                // Test if the function endpoint exists
+                console.log('🧪 Testing function endpoint availability...');
+                
+                let response;
+                try {
+                    response = await fetch('/.netlify/functions/keyword-research', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            keyword: keyword,
+                            max_supporting_keywords: parseInt(maxSupporting)
+                        })
+                    });
+                    console.log('✅ Fetch call completed successfully');
+                } catch (fetchError) {
+                    console.error('❌ FETCH ERROR:', fetchError);
+                    console.error('❌ Fetch error details:', {
+                        message: fetchError.message,
+                        name: fetchError.name,
+                        stack: fetchError.stack
+                    });
+                    throw fetchError;
+                }
                 
                 console.log('📡 Response received:', {
                     status: response.status,
@@ -645,8 +667,31 @@
                 updateProgress(2, 50, 'Extracting keywords from top 3 URLs...', 'Analyzing competitor data...');
                 
                 console.log('📊 Parsing response JSON...');
-                const data = await response.json();
-                console.log('📋 Response data:', data);
+                console.log('📄 Response status:', response.status);
+                console.log('📄 Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                let responseText;
+                try {
+                    responseText = await response.text();
+                    console.log('📄 Raw response text:', responseText);
+                    console.log('📄 Response text length:', responseText.length);
+                } catch (textError) {
+                    console.error('❌ ERROR reading response text:', textError);
+                    throw textError;
+                }
+                
+                let data;
+                try {
+                    if (!responseText || responseText.trim() === '') {
+                        throw new Error('Empty response from server');
+                    }
+                    data = JSON.parse(responseText);
+                    console.log('📋 Parsed response data:', data);
+                } catch (jsonError) {
+                    console.error('❌ JSON PARSE ERROR:', jsonError);
+                    console.error('❌ Raw response that failed to parse:', responseText);
+                    throw new Error(`Failed to parse JSON response: ${jsonError.message}. Raw response: ${responseText.substring(0, 200)}...`);
+                }
                 
                 updateProgress(3, 90, 'Finding supporting keywords...', 'Checking URL overlap...');
                 
