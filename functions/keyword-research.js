@@ -234,52 +234,48 @@ async function getSerpUrls(keyword, username, apiKey, maxUrls = 10) {
     }
     
     const data = await response.json();
-    console.log('    📊 SERP API Response:', JSON.stringify(data, null, 2));
+    console.log('    📊 SERP API Response status:', data.status_code);
     
-    // Check if the response is successful
-    if (data.status_code !== 20000) {
+    // Check if the response is successful (matching Python version)
+    if (data.status_code !== 20000 || !data.tasks) {
       console.error('    ❌ SERP API Error:', data.status_message || 'Unknown error');
       console.error('    ❌ Status code:', data.status_code);
-      return [];
-    }
-    
-    if (!data.tasks || !data.tasks[0]) {
-      console.error('    ❌ No tasks in response');
       return [];
     }
     
     const task = data.tasks[0];
     console.log('    📊 Task status:', task.status_code);
     
-    if (task.status_code !== 20000) {
-      console.error('    ❌ Task failed:', task.status_message || 'Unknown task error');
+    if (task.status_code !== 20000 || !task.result || !task.result[0]) {
+      console.error('    ❌ Task failed:', task.status_message || 'No result in task');
       return [];
     }
     
-    if (!task.result || !task.result[0]) {
-      console.error('    ❌ No result in task');
-      return [];
+    // Get the result data (matching Python version: data['tasks'][0]['result'][0])
+    const serpData = task.result[0];
+    console.log('    📊 SERP data keys:', Object.keys(serpData));
+    
+    const items = serpData.items || [];
+    console.log(`    📊 Found ${items.length} total SERP items`);
+    
+    if (items.length > 0) {
+      console.log('    📊 First item structure:', Object.keys(items[0]));
+      console.log('    📊 First item type:', items[0].type);
     }
     
-    const result = task.result[0];
-    console.log('    📊 Result structure:', Object.keys(result));
-    
-    const results = result.items || [];
-    console.log(`    📊 Found ${results.length} total SERP items`);
-    
-    if (results.length > 0) {
-      console.log('    📊 First item structure:', Object.keys(results[0]));
-      console.log('    📊 First item type:', results[0].type);
+    // Extract organic URLs (matching Python version logic)
+    const urls = [];
+    for (const item of items) {
+      if (item.type === 'organic' && urls.length < maxUrls) {
+        const url = item.url;
+        if (url) {
+          urls.push(url);
+        }
+      }
     }
     
-    const organicResults = results
-      .filter(item => item.type === 'organic')
-      .slice(0, maxUrls)
-      .map(item => item.url)
-      .filter(url => url);
-    
-    console.log(`    📊 Found ${organicResults.length} organic URLs`);
-    return organicResults;
+    console.log(`    📊 Found ${urls.length} organic URLs`);
+    return urls;
       
   } catch (error) {
     console.error(`    ❌ ERROR getting SERP URLs for "${keyword}":`, error);
