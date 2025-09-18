@@ -250,6 +250,134 @@
         .stat-card p {
             opacity: 0.9;
         }
+
+        /* Progress Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .progress-steps {
+            margin-bottom: 30px;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+        }
+
+        .step.completed {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+
+        .step-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            min-width: 30px;
+        }
+
+        .step-text {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .step-detail {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .current-action {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            min-height: 20px;
+        }
     </style>
 </head>
 <body>
@@ -314,6 +442,54 @@
             </div>
         </div>
 
+        <!-- Progress Modal -->
+        <div id="progressModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🔍 Keyword Research in Progress</h3>
+                    <span class="close" onclick="closeProgressModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="progress-steps">
+                        <div class="step" id="step1">
+                            <div class="step-icon">1️⃣</div>
+                            <div class="step-text">
+                                <div class="step-title">Getting Top 10 URLs</div>
+                                <div class="step-detail">Searching for top ranking pages...</div>
+                            </div>
+                        </div>
+                        <div class="step" id="step2">
+                            <div class="step-icon">2️⃣</div>
+                            <div class="step-text">
+                                <div class="step-title">Extracting Keywords</div>
+                                <div class="step-detail">Finding keywords from top 3 URLs...</div>
+                            </div>
+                        </div>
+                        <div class="step" id="step3">
+                            <div class="step-icon">3️⃣</div>
+                            <div class="step-text">
+                                <div class="step-title">Finding Supporting Keywords</div>
+                                <div class="step-detail">Checking URL overlap for each keyword...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Starting research...</div>
+                    <div class="current-action" id="currentAction"></div>
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button type="button" class="btn btn-secondary" onclick="toggleVerboseLogs()" id="verboseBtn">
+                            Show Verbose Logs
+                        </button>
+                    </div>
+                    <div id="verboseLogs" style="display: none; margin-top: 15px; max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;">
+                        <div id="logContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Loading State -->
         <div id="loading" class="loading">
             <div class="spinner"></div>
@@ -367,6 +543,71 @@
             }
         });
 
+        // Progress modal functions
+        function showProgressModal() {
+            document.getElementById('progressModal').style.display = 'flex';
+            resetProgress();
+        }
+
+        function closeProgressModal() {
+            document.getElementById('progressModal').style.display = 'none';
+        }
+
+        function resetProgress() {
+            // Reset all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+            
+            // Reset progress bar
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Starting research...';
+            document.getElementById('currentAction').textContent = '';
+            
+            // Clear verbose logs
+            document.getElementById('logContent').innerHTML = '';
+            document.getElementById('verboseLogs').style.display = 'none';
+            document.getElementById('verboseBtn').textContent = 'Show Verbose Logs';
+        }
+
+        function updateProgress(step, progress, text, action) {
+            // Update step status
+            if (step > 0) {
+                for (let i = 1; i < step; i++) {
+                    document.getElementById(`step${i}`).classList.add('completed');
+                }
+                document.getElementById(`step${step}`).classList.add('active');
+            }
+            
+            // Update progress bar
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressText').textContent = text;
+            document.getElementById('currentAction').textContent = action || '';
+            
+            // Add to verbose logs
+            addVerboseLog(`[${new Date().toLocaleTimeString()}] ${text} - ${action || ''}`);
+        }
+
+        function toggleVerboseLogs() {
+            const logsDiv = document.getElementById('verboseLogs');
+            const btn = document.getElementById('verboseBtn');
+            
+            if (logsDiv.style.display === 'none') {
+                logsDiv.style.display = 'block';
+                btn.textContent = 'Hide Verbose Logs';
+            } else {
+                logsDiv.style.display = 'none';
+                btn.textContent = 'Show Verbose Logs';
+            }
+        }
+
+        function addVerboseLog(message) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
         // Single keyword form
         document.getElementById('single-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -374,9 +615,11 @@
             const keyword = document.getElementById('keyword').value;
             const maxSupporting = document.getElementById('max-supporting').value;
             
-            showLoading();
+            showProgressModal();
             
             try {
+                updateProgress(1, 10, 'Getting top 10 URLs for your keyword...', 'Calling DataForSEO API...');
+                
                 const response = await fetch('/.netlify/functions/keyword-research', {
                     method: 'POST',
                     headers: {
@@ -388,18 +631,26 @@
                     })
                 });
                 
+                updateProgress(2, 50, 'Extracting keywords from top 3 URLs...', 'Analyzing competitor data...');
+                
                 const data = await response.json();
                 
+                updateProgress(3, 90, 'Finding supporting keywords...', 'Checking URL overlap...');
+                
                 if (data.success) {
-                    showSingleResults(data);
+                    updateProgress(3, 100, 'Research complete!', 'Found ' + data.supporting_keywords.length + ' supporting keywords');
+                    setTimeout(() => {
+                        closeProgressModal();
+                        showSingleResults(data);
+                    }, 1000);
                 } else {
+                    closeProgressModal();
                     showError(data.error || 'An error occurred');
                 }
             } catch (error) {
+                closeProgressModal();
                 showError('Network error: ' + error.message);
             }
-            
-            hideLoading();
         });
 
         // Batch processing form
@@ -414,10 +665,14 @@
                 return;
             }
             
-            showLoading();
+            showProgressModal();
             
             try {
+                updateProgress(1, 10, 'Reading CSV file...', 'Parsing keywords...');
+                
                 const csvText = await file.text();
+                
+                updateProgress(2, 30, 'Processing keywords...', `Analyzing up to ${maxKeywords} keywords...`);
                 
                 const response = await fetch('/.netlify/functions/batch-research', {
                     method: 'POST',
@@ -430,18 +685,24 @@
                     })
                 });
                 
+                updateProgress(3, 90, 'Finalizing results...', 'Compiling data...');
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    showBatchResults(data);
+                    updateProgress(3, 100, 'Batch processing complete!', `Processed ${data.successful}/${data.total_keywords} keywords successfully`);
+                    setTimeout(() => {
+                        closeProgressModal();
+                        showBatchResults(data);
+                    }, 1000);
                 } else {
+                    closeProgressModal();
                     showError(data.error || 'An error occurred');
                 }
             } catch (error) {
+                closeProgressModal();
                 showError('Network error: ' + error.message);
             }
-            
-            hideLoading();
         });
 
         function showLoading() {

@@ -23,7 +23,7 @@ exports.handler = async (event, context) => {
   // Set up timeout handler
   const timeoutId = setTimeout(() => {
     console.error('⏰ Function timeout - this should not happen');
-  }, 140000); // 140 seconds (less than Netlify's 150s limit)
+  }, 100000); // 100 seconds (well under Netlify's 150s limit)
 
   try {
     const body = JSON.parse(event.body || '{}');
@@ -118,37 +118,45 @@ exports.handler = async (event, context) => {
     console.log('🎯 STEP 3: Finding supporting keywords with 40%+ URL overlap...');
     const supportingKeywords = [];
     
-    for (let i = 0; i < Math.min(sortedKeywords.length, 20) && supportingKeywords.length < maxSupportingKeywords; i++) {
+    // Limit to top 10 keywords to avoid timeout
+    const maxKeywordsToCheck = Math.min(sortedKeywords.length, 10);
+    
+    for (let i = 0; i < maxKeywordsToCheck && supportingKeywords.length < maxSupportingKeywords; i++) {
       const candidateKeyword = sortedKeywords[i];
-      console.log(`  🔍 Checking keyword ${i + 1}/${Math.min(sortedKeywords.length, 20)}: "${candidateKeyword.keyword}"`);
+      console.log(`  🔍 Checking keyword ${i + 1}/${maxKeywordsToCheck}: "${candidateKeyword.keyword}"`);
       
-      const candidateUrls = await getSerpUrls(candidateKeyword.keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
-      if (candidateUrls.length === 0) {
-        console.log(`    ❌ No URLs found for "${candidateKeyword.keyword}", skipping`);
+      try {
+        const candidateUrls = await getSerpUrls(candidateKeyword.keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
+        if (candidateUrls.length === 0) {
+          console.log(`    ❌ No URLs found for "${candidateKeyword.keyword}", skipping`);
+          continue;
+        }
+        
+        const overlap = calculateUrlOverlap(originalTop10Urls, candidateUrls);
+        console.log(`    📊 Overlap: ${overlap}% (${originalTop10Urls.length} vs ${candidateUrls.length} URLs)`);
+        
+        if (overlap >= 40) {
+          const supportingKeyword = {
+            keyword: candidateKeyword.keyword,
+            search_volume: candidateKeyword.search_volume || 0,
+            cpc: candidateKeyword.cpc || 0,
+            overlap_percentage: overlap,
+            matching_urls: candidateUrls.filter(url => originalTop10Urls.includes(url)),
+            total_original_urls: originalTop10Urls.length
+          };
+          
+          supportingKeywords.push(supportingKeyword);
+          console.log(`    ✅ Added as supporting keyword (${overlap}% overlap)`);
+        } else {
+          console.log(`    ❌ Insufficient overlap (${overlap}%)`);
+        }
+      } catch (error) {
+        console.error(`    ❌ Error checking "${candidateKeyword.keyword}":`, error.message);
         continue;
       }
       
-      const overlap = calculateUrlOverlap(originalTop10Urls, candidateUrls);
-      console.log(`    📊 Overlap: ${overlap}% (${originalTop10Urls.length} vs ${candidateUrls.length} URLs)`);
-      
-      if (overlap >= 40) {
-        const supportingKeyword = {
-          keyword: candidateKeyword.keyword,
-          search_volume: candidateKeyword.search_volume || 0,
-          cpc: candidateKeyword.cpc || 0,
-          overlap_percentage: overlap,
-          matching_urls: candidateUrls.filter(url => originalTop10Urls.includes(url)),
-          total_original_urls: originalTop10Urls.length
-        };
-        
-        supportingKeywords.push(supportingKeyword);
-        console.log(`    ✅ Added as supporting keyword (${overlap}% overlap)`);
-      } else {
-        console.log(`    ❌ Insufficient overlap (${overlap}%)`);
-      }
-      
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Reduced rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`✅ Found ${supportingKeywords.length} supporting keywords`);
