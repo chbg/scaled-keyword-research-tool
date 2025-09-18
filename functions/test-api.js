@@ -1,100 +1,31 @@
+const fetch = require('node-fetch');
+
 exports.handler = async (event, context) => {
-  console.log('=== API TEST FUNCTION STARTED ===');
-  
-  // Handle CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: JSON.stringify({ message: 'CORS preflight' }) };
-  }
-
   try {
-    // API Keys
-    const DATAFORSEO_USERNAME = 'houston.barnettgearhart@gmail.com';
-    const DATAFORSEO_API_KEY = '78ed0af9b3c7e819';
+    const DATAFORSEO_USERNAME = process.env.DATAFORSEO_USERNAME;
+    const DATAFORSEO_API_KEY = process.env.DATAFORSEO_API_KEY;
 
-    console.log(`🔑 Testing API with credentials: ${DATAFORSEO_USERNAME}`);
+    console.log('Testing DataForSEO API...');
+    console.log('Username:', DATAFORSEO_USERNAME ? 'Set' : 'Missing');
+    console.log('API Key:', DATAFORSEO_API_KEY ? 'Set' : 'Missing');
 
-    // Test 1: Check user data
-    console.log('🧪 Test 1: Checking user data...');
-    const userData = await testUserData(DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
+    if (!DATAFORSEO_USERNAME || !DATAFORSEO_API_KEY) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Missing credentials' })
+      };
+    }
+
+    const auth = Buffer.from(`${DATAFORSEO_USERNAME}:${DATAFORSEO_API_KEY}`).toString('base64');
     
-    // Test 2: Try a simple SERP request
-    console.log('🧪 Test 2: Testing SERP API...');
-    const serpTest = await testSerpAPI(DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        tests: {
-          user_data: userData,
-          serp_api: serpTest
-        },
-        credentials: {
-          username: DATAFORSEO_USERNAME,
-          api_key_set: !!DATAFORSEO_API_KEY
-        }
-      })
-    };
-
-  } catch (error) {
-    console.error('❌ Test error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: error.message,
-        success: false
-      })
-    };
-  }
-};
-
-async function testUserData(username, apiKey) {
-  try {
-    const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-    
-    const response = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    
-    return {
-      success: response.ok,
-      status: response.status,
-      status_code: data.status_code,
-      message: data.status_message,
-      data: data
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-async function testSerpAPI(username, apiKey) {
-  try {
-    const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-    
-    const requestBody = [{
-      keyword: 'test',
-      location_code: 2840,
-      language_code: 'en'
-    }];
+    console.log('Making API call...');
+    const startTime = Date.now();
     
     const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
       method: 'POST',
@@ -102,25 +33,90 @@ async function testSerpAPI(username, apiKey) {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify([{
+        keyword: 'programmatic seo',
+        location_name: 'United States',
+        language_code: 'en',
+        depth: 10
+      }])
     });
     
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    console.log(`API call took ${duration}ms`);
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response:', errorText);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'API call failed',
+          status: response.status,
+          statusText: response.statusText,
+          duration: duration,
+          response: errorText
+        })
+      };
+    }
+    
     const data = await response.json();
+    console.log('API response received');
+    console.log('Status code:', data.status_code);
+    console.log('Tasks count:', data.tasks ? data.tasks.length : 0);
+    
+    if (data.tasks && data.tasks[0]) {
+      const task = data.tasks[0];
+      console.log('Task status:', task.status_code);
+      console.log('Task message:', task.status_message);
+      
+      if (task.result && task.result[0]) {
+        const items = task.result[0].items || [];
+        console.log('Items count:', items.length);
+        
+        const organicItems = items.filter(item => item.type === 'organic');
+        console.log('Organic items count:', organicItems.length);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            duration: duration,
+            status_code: data.status_code,
+            task_status: task.status_code,
+            total_items: items.length,
+            organic_items: organicItems.length,
+            urls: organicItems.slice(0, 5).map(item => item.url)
+          })
+        };
+      }
+    }
     
     return {
-      success: response.ok,
-      status: response.status,
-      status_code: data.status_code,
-      message: data.status_message,
-      has_tasks: !!data.tasks,
-      tasks_count: data.tasks ? data.tasks.length : 0,
-      has_result: !!(data.tasks && data.tasks[0] && data.tasks[0].result),
-      data: data
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        duration: duration,
+        data: data
+      })
     };
+
   } catch (error) {
+    console.error('Error:', error);
     return {
-      success: false,
-      error: error.message
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test failed',
+        message: error.message,
+        stack: error.stack
+      })
     };
   }
-}
+};
