@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-  console.log('=== KEYWORD RESEARCH FUNCTION STARTED ===');
+  console.log('=== KEYWORD RESEARCH FUNCTION v2.0 STARTED ===');
   console.log('Event:', JSON.stringify(event, null, 2));
   
   // Handle CORS
