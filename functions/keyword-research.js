@@ -248,13 +248,29 @@ async function getSerpUrls(keyword, username, apiKey, maxUrls = 10) {
       return [];
     }
     
-    if (!data.tasks[0].result || !data.tasks[0].result[0]) {
+    const task = data.tasks[0];
+    console.log('    📊 Task status:', task.status_code);
+    
+    if (task.status_code !== 20000) {
+      console.error('    ❌ Task failed:', task.status_message || 'Unknown task error');
+      return [];
+    }
+    
+    if (!task.result || !task.result[0]) {
       console.error('    ❌ No result in task');
       return [];
     }
     
-    const results = data.tasks[0].result[0].items || [];
+    const result = task.result[0];
+    console.log('    📊 Result structure:', Object.keys(result));
+    
+    const results = result.items || [];
     console.log(`    📊 Found ${results.length} total SERP items`);
+    
+    if (results.length > 0) {
+      console.log('    📊 First item structure:', Object.keys(results[0]));
+      console.log('    📊 First item type:', results[0].type);
+    }
     
     const organicResults = results
       .filter(item => item.type === 'organic')
