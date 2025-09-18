@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-  console.log('=== FAST KEYWORD RESEARCH FUNCTION ===');
+  console.log('=== KEYWORD RESEARCH FUNCTION v4.0 STARTED ===');
   
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -56,31 +56,45 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // FAST MODE: Only get top 3 URLs and check 3 keywords max
-    console.log('🔍 FAST MODE: Getting top 3 URLs for the keyword...');
-    const originalTop3Urls = await getSerpUrls(keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY, 3);
+    // Test API credentials first
+    console.log('🧪 Testing API credentials...');
+    const apiTest = await testDataForSEOAPI(DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
+    if (!apiTest.success) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'API authentication failed',
+          debug: apiTest
+        })
+      };
+    }
+
+    // STEP 1: Get top 10 URLs for the keyword
+    console.log('🔍 STEP 1: Getting top 10 URLs for the keyword...');
+    const originalTop10Urls = await getSerpUrls(keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
     
-    if (!originalTop3Urls || originalTop3Urls.length === 0) {
+    if (!originalTop10Urls || originalTop10Urls.length === 0) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
           error: 'Failed to get search results for keyword',
-          debug: { keyword, urlsFound: (originalTop3Urls && originalTop3Urls.length) || 0 }
+          debug: { keyword, urlsFound: (originalTop10Urls && originalTop10Urls.length) || 0 }
         })
       };
     }
 
-    console.log(`✅ Found ${originalTop3Urls.length} URLs for "${keyword}"`);
+    console.log(`✅ Found ${originalTop10Urls.length} URLs for "${keyword}"`);
 
-    // Get keywords from top 2 URLs only (faster)
-    console.log('📊 Getting keywords from top 2 URLs...');
-    const top2Urls = originalTop3Urls.slice(0, 2);
+    // STEP 2: Get keywords from top 3 URLs
+    console.log('📊 STEP 2: Getting keywords from top 3 URLs...');
+    const top3Urls = originalTop10Urls.slice(0, 3);
     const allKeywords = [];
 
-    for (let i = 0; i < top2Urls.length; i++) {
-      const url = top2Urls[i];
-      console.log(`  🔍 Getting ranked keywords for URL ${i + 1}/${top2Urls.length}: "${url}"`);
+    for (let i = 0; i < top3Urls.length; i++) {
+      const url = top3Urls[i];
+      console.log(`  🔍 Getting ranked keywords for URL ${i + 1}/${top3Urls.length}: "${url}"`);
       
       const rankedKeywords = await getRankedKeywords(url, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
       console.log(`  ✅ Found ${rankedKeywords.length} keywords for "${url}"`);
@@ -107,25 +121,25 @@ exports.handler = async (event, context) => {
         return cpcB - cpcA;
       });
 
-    console.log(`✅ Found ${sortedKeywords.length} unique keywords from top 2 URLs`);
+    console.log(`✅ Found ${sortedKeywords.length} unique keywords from top 3 URLs`);
 
-    // FAST MODE: Only check top 3 keywords for overlap
-    console.log('🎯 FAST MODE: Finding supporting keywords with 40%+ URL overlap...');
+    // STEP 3: Find supporting keywords with 40%+ URL overlap
+    console.log('🎯 STEP 3: Finding supporting keywords with 40%+ URL overlap...');
     const supportingKeywords = [];
     
-    for (let i = 0; i < Math.min(sortedKeywords.length, 3) && supportingKeywords.length < maxSupportingKeywords; i++) {
+    for (let i = 0; i < Math.min(sortedKeywords.length, 20) && supportingKeywords.length < maxSupportingKeywords; i++) {
       const candidateKeyword = sortedKeywords[i];
-      console.log(`  🔍 Checking keyword ${i + 1}/${Math.min(sortedKeywords.length, 3)}: "${candidateKeyword.keyword}"`);
+      console.log(`  🔍 Checking keyword ${i + 1}/${Math.min(sortedKeywords.length, 20)}: "${candidateKeyword.keyword}"`);
       
       try {
-        const candidateUrls = await getSerpUrls(candidateKeyword.keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY, 3);
+        const candidateUrls = await getSerpUrls(candidateKeyword.keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
         if (candidateUrls.length === 0) {
           console.log(`    ❌ No URLs found for "${candidateKeyword.keyword}", skipping`);
           continue;
         }
         
-        const overlap = calculateUrlOverlap(originalTop3Urls, candidateUrls);
-        console.log(`    📊 Overlap: ${overlap}% (${originalTop3Urls.length} vs ${candidateUrls.length} URLs)`);
+        const overlap = calculateUrlOverlap(originalTop10Urls, candidateUrls);
+        console.log(`    📊 Overlap: ${overlap}% (${originalTop10Urls.length} vs ${candidateUrls.length} URLs)`);
         
         if (overlap >= 40) {
           const supportingKeyword = {
@@ -133,8 +147,8 @@ exports.handler = async (event, context) => {
             search_volume: candidateKeyword.search_volume || 0,
             cpc: candidateKeyword.cpc || 0,
             overlap_percentage: overlap,
-            matching_urls: candidateUrls.filter(url => originalTop3Urls.includes(url)),
-            total_original_urls: originalTop3Urls.length
+            matching_urls: candidateUrls.filter(url => originalTop10Urls.includes(url)),
+            total_original_urls: originalTop10Urls.length
           };
           
           supportingKeywords.push(supportingKeyword);
@@ -147,7 +161,8 @@ exports.handler = async (event, context) => {
         continue;
       }
       
-      // No delay in fast mode
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     console.log(`✅ Found ${supportingKeywords.length} supporting keywords`);
@@ -158,12 +173,11 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         input_keyword: keyword,
-        original_top_3_urls: originalTop3Urls,
-        keywords_from_top_2_urls: sortedKeywords.slice(0, 10),
+        original_top_10_urls: originalTop10Urls,
+        keywords_from_top_3_urls: sortedKeywords.slice(0, 20),
         supporting_keywords: supportingKeywords,
         total_supporting_keywords_found: supportingKeywords.length,
-        processing_time: new Date().toISOString(),
-        mode: 'FAST_MODE'
+        processing_time: new Date().toISOString()
       })
     };
 
@@ -181,47 +195,67 @@ exports.handler = async (event, context) => {
   }
 };
 
-async function getSerpUrls(keyword, username, apiKey, maxUrls = 10) {
-  try {
-    console.log(`    🔍 Getting SERP URLs for: "${keyword}"`);
-    
-    const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced timeout
-    
-    const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify([{
-        keyword: keyword,
-        location_name: 'United States',
-        language_code: 'en',
-        depth: 10
-      }]),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
+async function getSerpUrls(keyword, username, apiKey, retries = 2) {
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      console.log(`    🔍 Getting SERP URLs for: "${keyword}" (attempt ${attempt}/${retries + 1})`);
+      
+      const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify([{
+          keyword: keyword,
+          location_name: "United States",
+          language_code: 'en',
+          depth: 10
+        }]),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
     const data = await response.json();
     const results = (data.tasks && data.tasks[0] && data.tasks[0].result && data.tasks[0].result[0] && data.tasks[0].result[0].items) || [];
-    
-    return results
-      .filter(item => item.type === 'organic')
-      .slice(0, maxUrls)
-      .map(item => item.url)
-      .filter(url => url);
       
-  } catch (error) {
-    console.error(`    ❌ Error getting SERP URLs for "${keyword}":`, error);
-    return [];
+      const urls = results
+        .filter(item => item.type === 'organic')
+        .slice(0, 10)
+        .map(item => item.url)
+        .filter(url => url);
+        
+      if (urls.length > 0) {
+        console.log(`    ✅ Found ${urls.length} URLs on attempt ${attempt}`);
+        return urls;
+      } else if (attempt <= retries) {
+        console.log(`    ⚠️ No URLs found, retrying... (${attempt}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        continue;
+      }
+      
+      return urls;
+      
+    } catch (error) {
+      console.error(`    ❌ Error getting SERP URLs for "${keyword}" (attempt ${attempt}):`, error.message);
+      
+      if (attempt <= retries) {
+        console.log(`    🔄 Retrying in 2 seconds... (${attempt}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+      
+      return [];
+    }
   }
 }
 
@@ -231,7 +265,7 @@ async function getRankedKeywords(url, username, apiKey) {
     
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     const response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live', {
       method: 'POST',
@@ -241,9 +275,9 @@ async function getRankedKeywords(url, username, apiKey) {
       },
       body: JSON.stringify([{
         target: url,
-        location_name: 'United States',
+        location_name: "United States",
         language_code: 'en',
-        limit: 50 // Reduced limit
+        limit: 100
       }]),
       signal: controller.signal
     });
@@ -293,4 +327,28 @@ function normalizeUrl(url) {
     .replace(/\/$/, '')
     .replace(/\?.*$/, '')
     .replace(/#.*$/, '');
+}
+
+async function testDataForSEOAPI(username, apiKey) {
+  try {
+    const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
+    const response = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    return {
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
