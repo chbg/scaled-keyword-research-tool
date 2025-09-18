@@ -123,12 +123,12 @@ exports.handler = async (event, context) => {
 
     console.log(`✅ Found ${sortedKeywords.length} unique keywords from top 3 URLs`);
 
-    // STEP 3: Find supporting keywords with 40%+ URL overlap
+    // STEP 3: Find supporting keywords with 40%+ URL overlap (FAST MODE)
     console.log('🎯 STEP 3: Finding supporting keywords with 40%+ URL overlap...');
     const supportingKeywords = [];
     
-    // Limit to top 10 keywords to avoid timeout
-    const maxKeywordsToCheck = Math.min(sortedKeywords.length, 10);
+    // Limit to top 5 keywords to avoid timeout
+    const maxKeywordsToCheck = Math.min(sortedKeywords.length, 5);
     
     for (let i = 0; i < maxKeywordsToCheck && supportingKeywords.length < maxSupportingKeywords; i++) {
       const candidateKeyword = sortedKeywords[i];
@@ -156,6 +156,12 @@ exports.handler = async (event, context) => {
           
           supportingKeywords.push(supportingKeyword);
           console.log(`    ✅ Added as supporting keyword (${overlap}% overlap)`);
+          
+          // Early exit if we have enough keywords
+          if (supportingKeywords.length >= maxSupportingKeywords) {
+            console.log(`    🎯 Found ${supportingKeywords.length} supporting keywords, stopping early`);
+            break;
+          }
         } else {
           console.log(`    ❌ Insufficient overlap (${overlap}%)`);
         }
@@ -164,8 +170,8 @@ exports.handler = async (event, context) => {
         continue;
       }
       
-      // Reduced rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Minimal rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     console.log(`✅ Found ${supportingKeywords.length} supporting keywords`);
@@ -198,14 +204,14 @@ exports.handler = async (event, context) => {
   }
 };
 
-async function getSerpUrls(keyword, username, apiKey, retries = 2) {
+async function getSerpUrls(keyword, username, apiKey, retries = 1) {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
       console.log(`    🔍 Getting SERP URLs for: "${keyword}" (attempt ${attempt}/${retries + 1})`);
       
       const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
       const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
         method: 'POST',
