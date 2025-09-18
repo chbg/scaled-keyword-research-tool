@@ -234,10 +234,22 @@ async function getSerpUrls(keyword, username, apiKey, maxUrls = 10) {
     }
     
     const data = await response.json();
+    console.log('    📊 SERP API Response:', JSON.stringify(data, null, 2));
     
     // Check if the response is successful
-    if (data.status_code !== 20000 || !data.tasks || !data.tasks[0] || !data.tasks[0].result || !data.tasks[0].result[0]) {
+    if (data.status_code !== 20000) {
       console.error('    ❌ SERP API Error:', data.status_message || 'Unknown error');
+      console.error('    ❌ Status code:', data.status_code);
+      return [];
+    }
+    
+    if (!data.tasks || !data.tasks[0]) {
+      console.error('    ❌ No tasks in response');
+      return [];
+    }
+    
+    if (!data.tasks[0].result || !data.tasks[0].result[0]) {
+      console.error('    ❌ No result in task');
       return [];
     }
     
