@@ -23,7 +23,7 @@ exports.handler = async (event, context) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    keyword = body.keyword?.trim() || '';
+    keyword = (body.keyword && body.keyword.trim()) || '';
     maxSupportingKeywords = body.max_supporting_keywords || 4;
 
     console.log(`📝 INPUT: Keyword="${keyword}", MaxSupportingKeywords=${maxSupportingKeywords}`);
@@ -80,7 +80,7 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({ 
           error: 'Failed to get search results for keyword',
-          debug: { keyword, urlsFound: originalTop10Urls?.length || 0 }
+          debug: { keyword, urlsFound: (originalTop10Urls && originalTop10Urls.length) || 0 }
         })
       };
     }
@@ -225,8 +225,8 @@ async function getSerpUrls(keyword, username, apiKey, retries = 2) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const data = await response.json();
-      const results = data.tasks?.[0]?.result?.[0]?.items || [];
+    const data = await response.json();
+    const results = (data.tasks && data.tasks[0] && data.tasks[0].result && data.tasks[0].result[0] && data.tasks[0].result[0].items) || [];
       
       const urls = results
         .filter(item => item.type === 'organic')
@@ -289,19 +289,19 @@ async function getRankedKeywords(url, username, apiKey) {
     }
     
     const data = await response.json();
-    const task = data.tasks?.[0];
+    const task = data.tasks && data.tasks[0];
     
-    if (task?.status_code !== 20000 || !task?.result?.[0]?.items) {
+    if (!task || task.status_code !== 20000 || !task.result || !task.result[0] || !task.result[0].items) {
       return [];
     }
     
     return task.result[0].items
-      .filter(item => item.ranked_serp_element?.serp_item?.rank_group <= 10)
+      .filter(item => item.ranked_serp_element && item.ranked_serp_element.serp_item && item.ranked_serp_element.serp_item.rank_group <= 10)
       .map(item => ({
-        keyword: item.keyword_data?.keyword || '',
-        search_volume: item.keyword_data?.keyword_info?.search_volume || 0,
-        cpc: item.keyword_data?.keyword_info?.cpc || 0,
-        position: item.ranked_serp_element?.serp_item?.rank_group || 0
+        keyword: (item.keyword_data && item.keyword_data.keyword) || '',
+        search_volume: (item.keyword_data && item.keyword_data.keyword_info && item.keyword_data.keyword_info.search_volume) || 0,
+        cpc: (item.keyword_data && item.keyword_data.keyword_info && item.keyword_data.keyword_info.cpc) || 0,
+        position: (item.ranked_serp_element && item.ranked_serp_element.serp_item && item.ranked_serp_element.serp_item.rank_group) || 0
       }))
       .filter(kw => kw.keyword && kw.keyword.trim());
       
