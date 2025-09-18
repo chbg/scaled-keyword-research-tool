@@ -1,0 +1,25 @@
+{
+  "name": "keyword-research-netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for keyword research tool",
+  "main": "keyword-research.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "csv-parser": "^3.0.0"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "build": "echo 'Build complete'",
+    "start": "netlify dev"
+  },
+  "keywords": [
+    "keyword-research",
+    "seo",
+    "netlify",
+    "serverless"
+  ],
+  "author": "Houston Barnett-Gearhart",
+  "license": "MIT"
+}

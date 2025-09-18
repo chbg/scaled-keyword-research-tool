@@ -1,0 +1,28 @@
+[build]
+  command = "cd functions && npm install"
+  functions = "functions"
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["node-fetch", "csv-parser"]
+
+[dev]
+  command = "cd functions && npm install && netlify dev"
+  port = 8888
+  publish = "."
+
+# GitHub-specific settings
+[context.production]
+  command = "cd functions && npm ci && npm run build"
+
+[context.deploy-preview]
+  command = "cd functions && npm ci"
