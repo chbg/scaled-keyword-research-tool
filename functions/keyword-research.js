@@ -214,13 +214,25 @@ async function getSerpUrls(keyword, username, apiKey, maxUrls = 5) {
     }
     
     const data = await response.json();
-    const results = (data.tasks && data.tasks[0] && data.tasks[0].result && data.tasks[0].result[0] && data.tasks[0].result[0].items) || [];
+    console.log('    📊 SERP API Response:', JSON.stringify(data, null, 2));
     
-    return results
+    // Check if the response is successful
+    if (data.status_code !== 20000 || !data.tasks || !data.tasks[0] || !data.tasks[0].result || !data.tasks[0].result[0]) {
+      console.error('    ❌ SERP API Error:', data.status_message || 'Unknown error');
+      return [];
+    }
+    
+    const results = data.tasks[0].result[0].items || [];
+    console.log(`    📊 Found ${results.length} total SERP items`);
+    
+    const organicResults = results
       .filter(item => item.type === 'organic')
       .slice(0, maxUrls)
       .map(item => item.url)
       .filter(url => url);
+    
+    console.log(`    📊 Found ${organicResults.length} organic URLs`);
+    return organicResults;
       
   } catch (error) {
     console.error(`    ❌ ERROR getting SERP URLs for "${keyword}":`, error);
@@ -258,13 +270,25 @@ async function getRankedKeywords(url, username, apiKey) {
     }
     
     const data = await response.json();
-    const task = data.tasks && data.tasks[0];
+    console.log('    📊 Ranked Keywords API Response:', JSON.stringify(data, null, 2));
     
-    if (!task || task.status_code !== 20000 || !task.result || !task.result[0] || !task.result[0].items) {
+    // Check if the response is successful
+    if (data.status_code !== 20000 || !data.tasks || !data.tasks[0]) {
+      console.error('    ❌ Ranked Keywords API Error:', data.status_message || 'Unknown error');
       return [];
     }
     
-    return task.result[0].items
+    const task = data.tasks[0];
+    
+    if (task.status_code !== 20000 || !task.result || !task.result[0] || !task.result[0].items) {
+      console.error('    ❌ Task Error:', task.status_message || 'No results found');
+      return [];
+    }
+    
+    const items = task.result[0].items || [];
+    console.log(`    📊 Found ${items.length} ranked keyword items`);
+    
+    const keywords = items
       .filter(item => item.ranked_serp_element && item.ranked_serp_element.serp_item && item.ranked_serp_element.serp_item.rank_group <= 10)
       .map(item => ({
         keyword: (item.keyword_data && item.keyword_data.keyword) || '',
@@ -273,6 +297,9 @@ async function getRankedKeywords(url, username, apiKey) {
         position: (item.ranked_serp_element && item.ranked_serp_element.serp_item && item.ranked_serp_element.serp_item.rank_group) || 0
       }))
       .filter(kw => kw.keyword && kw.keyword.trim());
+    
+    console.log(`    📊 Found ${keywords.length} valid keywords`);
+    return keywords;
       
   } catch (error) {
     console.error(`    ❌ ERROR getting ranked keywords for "${url}":`, error);
