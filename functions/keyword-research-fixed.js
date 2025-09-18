@@ -198,68 +198,48 @@ exports.handler = async (event, context) => {
   }
 };
 
-async function getSerpUrls(keyword, username, apiKey, retries = 2) {
-  for (let attempt = 1; attempt <= retries + 1; attempt++) {
-    try {
-      console.log(`    🔍 Getting SERP URLs for: "${keyword}" (attempt ${attempt}/${retries + 1})`);
-      
-      const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify([{
-          keyword: keyword,
-          location_code: 2840,
-          language_code: 'en',
-          device: 'desktop',
-          os: 'windows'
-        }]),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      const results = data.tasks?.[0]?.result?.[0]?.items || [];
-      
-      const urls = results
-        .filter(item => item.type === 'organic')
-        .slice(0, 10)
-        .map(item => item.url)
-        .filter(url => url);
-        
-      if (urls.length > 0) {
-        console.log(`    ✅ Found ${urls.length} URLs on attempt ${attempt}`);
-        return urls;
-      } else if (attempt <= retries) {
-        console.log(`    ⚠️ No URLs found, retrying... (${attempt}/${retries})`);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-        continue;
-      }
-      
-      return urls;
-      
-    } catch (error) {
-      console.error(`    ❌ Error getting SERP URLs for "${keyword}" (attempt ${attempt}):`, error.message);
-      
-      if (attempt <= retries) {
-        console.log(`    🔄 Retrying in 2 seconds... (${attempt}/${retries})`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-      
-      return [];
+async function getSerpUrls(keyword, username, apiKey) {
+  try {
+    console.log(`    🔍 Getting SERP URLs for: "${keyword}"`);
+    
+    const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify([{
+        keyword: keyword,
+        location_code: 2840,
+        language_code: 'en',
+        device: 'desktop',
+        os: 'windows'
+      }]),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+    
+    const data = await response.json();
+    const results = data.tasks?.[0]?.result?.[0]?.items || [];
+    
+    return results
+      .filter(item => item.type === 'organic')
+      .slice(0, 10)
+      .map(item => item.url)
+      .filter(url => url);
+      
+  } catch (error) {
+    console.error(`    ❌ Error getting SERP URLs for "${keyword}":`, error);
+    return [];
   }
 }
 
@@ -269,7 +249,7 @@ async function getRankedKeywords(url, username, apiKey) {
     
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     const response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live', {
       method: 'POST',
