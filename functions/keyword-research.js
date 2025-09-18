@@ -23,12 +23,18 @@ exports.handler = async (event, context) => {
   // Set up timeout handler
   const timeoutId = setTimeout(() => {
     console.error('⏰ Function timeout - this should not happen');
-  }, 100000); // 100 seconds (well under Netlify's 150s limit)
+  }, 120000); // 120 seconds (well under Netlify's 150s limit)
 
   try {
     const body = JSON.parse(event.body || '{}');
     const keyword = body.keyword?.trim() || '';
     const maxSupportingKeywords = body.max_supporting_keywords || 4;
+    
+    // Debug environment variables
+    console.log('🔧 Environment check:');
+    console.log('DATAFORSEO_USERNAME:', DATAFORSEO_USERNAME ? 'Set' : 'Missing');
+    console.log('DATAFORSEO_API_KEY:', DATAFORSEO_API_KEY ? 'Set' : 'Missing');
+    console.log('OPENAI_API_KEY:', OPENAI_API_KEY ? 'Set' : 'Missing');
 
     console.log(`📝 INPUT: Keyword="${keyword}", MaxSupportingKeywords=${maxSupportingKeywords}`);
 
@@ -203,7 +209,7 @@ async function getSerpUrls(keyword, username, apiKey) {
     
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
       method: 'POST',
@@ -241,7 +247,7 @@ async function getRankedKeywords(url, username, apiKey) {
     
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     const response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live', {
       method: 'POST',
@@ -316,7 +322,7 @@ async function testDataForSEOAPI(username, apiKey) {
     
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     const response = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
       method: 'GET',

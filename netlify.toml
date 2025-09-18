@@ -15,6 +15,12 @@
   node_bundler = "esbuild"
   external_node_modules = ["node-fetch", "csv-parser"]
 
+[functions."keyword-research"]
+  timeout = 300
+
+[functions."batch-research"]
+  timeout = 300
+
 [dev]
   command = "cd functions && npm install && netlify dev"
   port = 8888
