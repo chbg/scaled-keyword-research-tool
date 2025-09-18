@@ -44,13 +44,8 @@ exports.handler = async (event, context) => {
     // API Keys
     const DATAFORSEO_USERNAME = 'houston.barnettgearhart@gmail.com';
     const DATAFORSEO_API_KEY = '78ed0af9b3c7e819';
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'not-set';
 
     console.log(`🔑 API Keys: DataForSEO=${DATAFORSEO_API_KEY ? 'SET' : 'NOT SET'}`);
-    console.log('🔧 Environment check:');
-    console.log('DATAFORSEO_USERNAME:', DATAFORSEO_USERNAME ? 'Set' : 'Missing');
-    console.log('DATAFORSEO_API_KEY:', DATAFORSEO_API_KEY ? 'Set' : 'Missing');
-    console.log('OPENAI_API_KEY:', OPENAI_API_KEY ? 'Set' : 'Missing');
 
     // Test API credentials first
     console.log('🧪 Testing API credentials...');
