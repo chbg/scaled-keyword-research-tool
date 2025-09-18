@@ -215,10 +215,9 @@ async function getSerpUrls(keyword, username, apiKey, retries = 2) {
         },
         body: JSON.stringify([{
           keyword: keyword,
-          location_code: 2840,
+          location_name: "United States",
           language_code: 'en',
-          device: 'desktop',
-          os: 'windows'
+          depth: 10
         }]),
         signal: controller.signal
       });
@@ -279,7 +278,7 @@ async function getRankedKeywords(url, username, apiKey) {
       },
       body: JSON.stringify([{
         target: url,
-        location_code: 2840,
+        location_name: "United States",
         language_code: 'en',
         limit: 100
       }]),
