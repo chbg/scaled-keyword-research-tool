@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-  console.log('=== KEYWORD RESEARCH FUNCTION v2.0 STARTED ===');
+  console.log('=== KEYWORD RESEARCH FUNCTION v3.0 STARTED ===');
   console.log('Event:', JSON.stringify(event, null, 2));
   
   // Handle CORS
@@ -75,13 +75,13 @@ exports.handler = async (event, context) => {
         })
       };
     }
-    console.log('✅ API credentials verified');
 
     // STEP 1: Get top 10 URLs for the keyword
     console.log('🔍 STEP 1: Getting top 10 URLs for the keyword...');
     const originalTop10Urls = await getSerpUrls(keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY);
     
     if (!originalTop10Urls || originalTop10Urls.length === 0) {
+      clearTimeout(timeoutId);
       return {
         statusCode: 400,
         headers,
@@ -91,13 +91,14 @@ exports.handler = async (event, context) => {
         })
       };
     }
+
     console.log(`✅ Found ${originalTop10Urls.length} URLs for "${keyword}"`);
 
     // STEP 2: Get keywords from top 3 URLs
     console.log('📊 STEP 2: Getting keywords from top 3 URLs...');
     const top3Urls = originalTop10Urls.slice(0, 3);
     const allKeywords = [];
-    
+
     for (let i = 0; i < top3Urls.length; i++) {
       const url = top3Urls[i];
       console.log(`  🔍 Getting ranked keywords for URL ${i + 1}/${top3Urls.length}: "${url}"`);
@@ -108,24 +109,24 @@ exports.handler = async (event, context) => {
       allKeywords.push(...rankedKeywords);
     }
 
-    // Remove duplicates and sort by volume (desc) and CPC (desc)
-    const uniqueKeywords = {};
+    // Remove duplicates and sort by volume and CPC
+    const uniqueKeywords = new Map();
     allKeywords.forEach(kw => {
       const key = kw.keyword.toLowerCase();
-      if (!uniqueKeywords[key] || (kw.search_volume || 0) > (uniqueKeywords[key].search_volume || 0)) {
-        uniqueKeywords[key] = kw;
+      if (!uniqueKeywords.has(key) || uniqueKeywords.get(key).search_volume < kw.search_volume) {
+        uniqueKeywords.set(key, kw);
       }
     });
-    
-    const sortedKeywords = Object.values(uniqueKeywords).sort((a, b) => {
-      const volumeA = a.search_volume || 0;
-      const volumeB = b.search_volume || 0;
-      const cpcA = a.cpc || 0;
-      const cpcB = b.cpc || 0;
-      
-      if (volumeB !== volumeA) return volumeB - volumeA;
-      return cpcB - cpcA;
-    });
+
+    const sortedKeywords = Array.from(uniqueKeywords.values())
+      .sort((a, b) => {
+        const volumeA = a.search_volume || 0;
+        const volumeB = b.search_volume || 0;
+        if (volumeB !== volumeA) return volumeB - volumeA;
+        const cpcA = a.cpc || 0;
+        const cpcB = b.cpc || 0;
+        return cpcB - cpcA;
+      });
 
     console.log(`✅ Found ${sortedKeywords.length} unique keywords from top 3 URLs`);
 
@@ -187,30 +188,24 @@ exports.handler = async (event, context) => {
         keywords_from_top_3_urls: sortedKeywords.slice(0, 20),
         supporting_keywords: supportingKeywords,
         total_supporting_keywords_found: supportingKeywords.length,
-        processing_time: 'completed',
-        timestamp: new Date().toISOString()
+        processing_time: new Date().toISOString()
       })
     };
 
   } catch (error) {
     console.error('❌ Error:', error);
-    console.error('❌ Error stack:', error.stack);
-    
     clearTimeout(timeoutId);
-    
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        success: false,
-        error: error.message || 'Unknown error occurred',
+        error: 'Internal server error',
+        message: error.message,
         keyword: keyword || 'unknown'
       })
     };
   }
 };
-
-// Helper Functions
 
 async function getSerpUrls(keyword, username, apiKey) {
   try {
@@ -237,13 +232,20 @@ async function getSerpUrls(keyword, username, apiKey) {
     });
     
     clearTimeout(timeoutId);
-    const data = await response.json();
     
-    if (data.status_code === 20000 && data.tasks && data.tasks[0].result) {
-      const serpData = data.tasks[0].result[0];
-      return (serpData.items || []).slice(0, 10).map(item => normalizeUrl(item.url));
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return [];
+    
+    const data = await response.json();
+    const results = data.tasks?.[0]?.result?.[0]?.items || [];
+    
+    return results
+      .filter(item => item.type === 'organic')
+      .slice(0, 10)
+      .map(item => item.url)
+      .filter(url => url);
+      
   } catch (error) {
     console.error(`    ❌ Error getting SERP URLs for "${keyword}":`, error);
     return [];
@@ -274,26 +276,28 @@ async function getRankedKeywords(url, username, apiKey) {
     });
     
     clearTimeout(timeoutId);
-    const data = await response.json();
     
-    if (data.status_code === 20000 && data.tasks && data.tasks[0].result) {
-      const result = data.tasks[0].result[0];
-      if (result && result.items) {
-        return result.items
-          .filter(item => {
-            const position = item.ranked_serp_element?.serp_item?.rank_group || 0;
-            return position >= 1 && position <= 10;
-          })
-          .map(item => ({
-            keyword: item.keyword_data?.keyword || '',
-            search_volume: item.keyword_data?.keyword_info?.search_volume || 0,
-            cpc: item.keyword_data?.keyword_info?.cpc || 0,
-            position: item.ranked_serp_element?.serp_item?.rank_group || 0
-          }))
-          .filter(kw => kw.keyword && kw.keyword.trim());
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return [];
+    
+    const data = await response.json();
+    const task = data.tasks?.[0];
+    
+    if (task?.status_code !== 20000 || !task?.result?.[0]?.items) {
+      return [];
+    }
+    
+    return task.result[0].items
+      .filter(item => item.ranked_serp_element?.serp_item?.rank_group <= 10)
+      .map(item => ({
+        keyword: item.keyword_data?.keyword || '',
+        search_volume: item.keyword_data?.keyword_info?.search_volume || 0,
+        cpc: item.keyword_data?.keyword_info?.cpc || 0,
+        position: item.ranked_serp_element?.serp_item?.rank_group || 0
+      }))
+      .filter(kw => kw.keyword && kw.keyword.trim());
+      
   } catch (error) {
     console.error(`    ❌ Error getting ranked keywords for "${url}":`, error);
     return [];
@@ -301,67 +305,43 @@ async function getRankedKeywords(url, username, apiKey) {
 }
 
 function calculateUrlOverlap(urls1, urls2) {
-  if (urls1.length === 0 || urls2.length === 0) return 0;
+  const set1 = new Set(urls1.map(normalizeUrl));
+  const set2 = new Set(urls2.map(normalizeUrl));
   
-  const set1 = new Set(urls1);
-  const set2 = new Set(urls2);
+  const intersection = new Set([...set1].filter(url => set2.has(url)));
+  const union = new Set([...set1, ...set2]);
   
-  let matches = 0;
-  for (const url of set1) {
-    if (set2.has(url)) {
-      matches++;
-    }
-  }
-  
-  return Math.round((matches / Math.min(urls1.length, urls2.length)) * 100);
+  return Math.round((intersection.size / union.size) * 100);
 }
 
 function normalizeUrl(url) {
-  if (!url) return '';
   return url
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
+    .toLowerCase()
     .replace(/\/$/, '')
-    .toLowerCase();
+    .replace(/\?.*$/, '')
+    .replace(/#.*$/, '');
 }
 
 async function testDataForSEOAPI(username, apiKey) {
   try {
-    console.log('    🧪 Testing DataForSEO API credentials...');
-    
     const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
     const response = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json'
-      },
-      signal: controller.signal
+      }
     });
     
-    clearTimeout(timeoutId);
-    const data = await response.json();
-    
-    if (data.status_code === 20000) {
-      console.log('    ✅ API credentials are valid');
-      return { success: true, data: data };
-    } else {
-      console.log('    ❌ API credentials failed:', data);
-      return { 
-        success: false, 
-        error: data.status_message || 'Unknown API error',
-        status_code: data.status_code
-      };
-    }
+    return {
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText
+    };
   } catch (error) {
-    console.error('    ❌ API test error:', error);
-    return { 
-      success: false, 
-      error: error.message,
-      type: 'network_error'
+    return {
+      success: false,
+      error: error.message
     };
   }
 }
