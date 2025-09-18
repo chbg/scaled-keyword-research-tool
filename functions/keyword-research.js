@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-  console.log('=== OPTIMIZED KEYWORD RESEARCH FUNCTION STARTED ===');
+  console.log('=== KEYWORD RESEARCH FUNCTION STARTED ===');
   console.log('Event:', JSON.stringify(event, null, 2));
   
   // Handle CORS
@@ -41,11 +41,26 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // API Keys
-    const DATAFORSEO_USERNAME = 'houston.barnettgearhart@gmail.com';
-    const DATAFORSEO_API_KEY = '78ed0af9b3c7e819';
+    // API Keys from environment variables
+    const DATAFORSEO_USERNAME = process.env.DATAFORSEO_USERNAME;
+    const DATAFORSEO_API_KEY = process.env.DATAFORSEO_API_KEY;
 
     console.log(`🔑 API Keys: DataForSEO=${DATAFORSEO_API_KEY ? 'SET' : 'NOT SET'}`);
+    
+    if (!DATAFORSEO_USERNAME || !DATAFORSEO_API_KEY) {
+      clearTimeout(timeoutId);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Missing API credentials',
+          debug: {
+            DATAFORSEO_USERNAME: DATAFORSEO_USERNAME ? 'Set' : 'Missing',
+            DATAFORSEO_API_KEY: DATAFORSEO_API_KEY ? 'Set' : 'Missing'
+          }
+        })
+      };
+    }
 
     // Test API credentials first
     console.log('🧪 Testing API credentials...');
