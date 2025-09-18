@@ -12,7 +12,8 @@
   },
   "scripts": {
     "build": "echo 'Build complete'",
-    "start": "netlify dev"
+    "start": "netlify dev",
+    "prebuild": "npm install"
   },
   "keywords": [
     "keyword-research",

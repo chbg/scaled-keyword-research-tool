@@ -19,10 +19,3 @@
   command = "cd functions && npm install && netlify dev"
   port = 8888
   publish = "."
-
-# GitHub-specific settings
-[context.production]
-  command = "cd functions && npm ci && npm run build"
-
-[context.deploy-preview]
-  command = "cd functions && npm ci"
