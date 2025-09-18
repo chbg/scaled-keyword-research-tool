@@ -29,6 +29,7 @@ exports.handler = async (event, context) => {
     console.log(`📝 INPUT: Keyword="${keyword}", MaxSupportingKeywords=${maxSupportingKeywords}`);
 
     if (!keyword) {
+      console.error('❌ ERROR: No keyword provided');
       return {
         statusCode: 400,
         headers,
@@ -43,6 +44,11 @@ exports.handler = async (event, context) => {
     console.log(`🔑 API Keys: DataForSEO=${DATAFORSEO_API_KEY ? 'SET' : 'NOT SET'}`);
     
     if (!DATAFORSEO_USERNAME || !DATAFORSEO_API_KEY) {
+      console.error('❌ ERROR: Missing API credentials');
+      console.error('❌ DEBUG:', {
+        DATAFORSEO_USERNAME: DATAFORSEO_USERNAME ? 'Set' : 'Missing',
+        DATAFORSEO_API_KEY: DATAFORSEO_API_KEY ? 'Set' : 'Missing'
+      });
       return {
         statusCode: 500,
         headers,
@@ -61,6 +67,8 @@ exports.handler = async (event, context) => {
     const originalTop10Urls = await getSerpUrls(keyword, DATAFORSEO_USERNAME, DATAFORSEO_API_KEY, 10);
     
     if (!originalTop10Urls || originalTop10Urls.length === 0) {
+      console.error('❌ ERROR: No URLs found for primary keyword');
+      console.error('❌ DEBUG:', { keyword, urlsFound: (originalTop10Urls && originalTop10Urls.length) || 0 });
       return {
         statusCode: 400,
         headers,
@@ -187,7 +195,14 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ CRITICAL ERROR in main function:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      name: error.name,
+      keyword: keyword || 'unknown',
+      maxSupportingKeywords: maxSupportingKeywords || 'unknown'
+    });
     return {
       statusCode: 500,
       headers,
@@ -239,7 +254,13 @@ async function getSerpUrls(keyword, username, apiKey, maxUrls = 10) {
       .filter(url => url);
       
   } catch (error) {
-    console.error(`    ❌ Error getting SERP URLs for "${keyword}":`, error);
+    console.error(`    ❌ ERROR getting SERP URLs for "${keyword}":`, error);
+    console.error(`    ❌ SERP Error details:`, {
+      message: error.message,
+      name: error.name,
+      keyword: keyword,
+      maxUrls: maxUrls
+    });
     return [];
   }
 }

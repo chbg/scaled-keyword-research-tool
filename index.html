@@ -618,8 +618,12 @@
             showProgressModal();
             
             try {
+                console.log('🚀 Starting keyword research...');
+                console.log('📝 Input:', { keyword, maxSupportingKeywords: parseInt(maxSupporting) });
+                
                 updateProgress(1, 10, 'Getting top 10 URLs for your keyword...', 'Calling DataForSEO API...');
                 
+                console.log('🌐 Making API call to keyword-research function...');
                 const response = await fetch('/.netlify/functions/keyword-research', {
                     method: 'POST',
                     headers: {
@@ -631,23 +635,40 @@
                     })
                 });
                 
+                console.log('📡 Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
                 updateProgress(2, 50, 'Extracting keywords from top 3 URLs...', 'Analyzing competitor data...');
                 
+                console.log('📊 Parsing response JSON...');
                 const data = await response.json();
+                console.log('📋 Response data:', data);
                 
                 updateProgress(3, 90, 'Finding supporting keywords...', 'Checking URL overlap...');
                 
                 if (data.success) {
+                    console.log('✅ Research successful!', data);
                     updateProgress(3, 100, 'Research complete!', 'Found ' + data.supporting_keywords.length + ' supporting keywords');
                     setTimeout(() => {
                         closeProgressModal();
                         showSingleResults(data);
                     }, 1000);
                 } else {
+                    console.error('❌ API returned error:', data);
                     closeProgressModal();
                     showError(data.error || 'An error occurred');
                 }
             } catch (error) {
+                console.error('❌ CRITICAL ERROR in frontend:', error);
+                console.error('❌ Error details:', {
+                    message: error.message,
+                    name: error.name,
+                    stack: error.stack
+                });
                 closeProgressModal();
                 showError('Network error: ' + error.message);
             }
@@ -668,12 +689,18 @@
             showProgressModal();
             
             try {
+                console.log('🚀 Starting batch processing...');
+                console.log('📁 File:', { name: file.name, size: file.size, type: file.type });
+                console.log('📝 Max keywords:', maxKeywords);
+                
                 updateProgress(1, 10, 'Reading CSV file...', 'Parsing keywords...');
                 
                 const csvText = await file.text();
+                console.log('📄 CSV content length:', csvText.length);
                 
                 updateProgress(2, 30, 'Processing keywords...', `Analyzing up to ${maxKeywords} keywords...`);
                 
+                console.log('🌐 Making API call to batch-research function...');
                 const response = await fetch('/.netlify/functions/batch-research', {
                     method: 'POST',
                     headers: {
@@ -685,21 +712,36 @@
                     })
                 });
                 
+                console.log('📡 Batch response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+                
                 updateProgress(3, 90, 'Finalizing results...', 'Compiling data...');
                 
                 const data = await response.json();
+                console.log('📋 Batch response data:', data);
                 
                 if (data.success) {
+                    console.log('✅ Batch processing successful!', data);
                     updateProgress(3, 100, 'Batch processing complete!', `Processed ${data.successful}/${data.total_keywords} keywords successfully`);
                     setTimeout(() => {
                         closeProgressModal();
                         showBatchResults(data);
                     }, 1000);
                 } else {
+                    console.error('❌ Batch API returned error:', data);
                     closeProgressModal();
                     showError(data.error || 'An error occurred');
                 }
             } catch (error) {
+                console.error('❌ CRITICAL ERROR in batch processing:', error);
+                console.error('❌ Batch error details:', {
+                    message: error.message,
+                    name: error.name,
+                    stack: error.stack
+                });
                 closeProgressModal();
                 showError('Network error: ' + error.message);
             }
