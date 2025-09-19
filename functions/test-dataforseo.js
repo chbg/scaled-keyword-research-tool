@@ -40,7 +40,10 @@ exports.handler = async (event, context) => {
     
     const auth = Buffer.from(`${DATAFORSEO_USERNAME}:${DATAFORSEO_API_KEY}`).toString('base64');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout reached, aborting request');
+      controller.abort();
+    }, 3000); // 3 second timeout
     
     const response = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
       method: 'POST',
